@@ -36,6 +36,7 @@ public class Main {
         }
     }
 
+
     private static void managePets(PetService petService) {
         boolean exit = false;
         while (!exit) {
@@ -68,7 +69,7 @@ public class Main {
             String input = InputUtil.getText("Choose option").trim().toUpperCase();
             switch (input) {
                 case "P" -> { if (currentPage > 1) currentPage--; else System.out.println("Already at first page!"); }
-                case "N" -> { if (currentPage * pageSize < pets.size()) currentPage++; else System.out.println("Already at last page!"); }
+                case "N" -> { if (currentPage < ((pets.size() + pageSize - 1) / pageSize)) currentPage++; else System.out.println("Already at last page!"); }
                 case "Q" -> paginateExit = true;
                 default -> System.out.println("Invalid input!");
             }
@@ -99,9 +100,17 @@ public class Main {
 
     private static void updatePet(PetService petService) {
         ViewUtil.printHeader("Update pet by ID");
-        int petId = InputUtil.getInteger("Enter pet ID");
-        Pet existing = petService.getPetById(petId);
-        if (existing == null) { System.out.println("Pet not found!"); return; }
+        int petId;
+        Pet existing;
+        while (true) {
+            petId = InputUtil.getInteger("Enter Pet ID: ");
+            try {
+                existing = petService.getPetById(petId);
+                break;
+            } catch (RuntimeException e) {
+                System.out.println("Pet ID not found!");
+            }
+        }
 
         String name = InputUtil.getOptionalValidatedName("Enter name", existing.getName());
         String type = InputUtil.getOptionalValidatedType("Enter type", existing.getType());
@@ -117,18 +126,26 @@ public class Main {
 
     private static void deletePet(PetService petService) {
         ViewUtil.printHeader("Delete pet by ID");
-        String input = InputUtil.getText("Enter pet ID (or Q to quit)").trim();
-        if (input.equalsIgnoreCase("Q")) return;
 
-        int petId = Integer.parseInt(input);
-        Pet pet = petService.getPetById(petId);
-        if (pet == null) { System.out.println("Pet not found!"); return; }
+
+        int petId;
+        Pet pet;
+        while (true) {
+            petId = InputUtil.getInteger("Enter Pet ID: ");
+            try {
+                pet = petService.getPetById(petId);
+                break;
+            } catch (RuntimeException e) {
+                System.out.println("Pet ID not found!");
+            }
+        }
 
         String confirm = InputUtil.getText("Are you sure? [Y/n]").trim();
         if (confirm.equalsIgnoreCase("Y")) petService.deleteById(petId);
         ViewUtil.printHeader("Pet deleted successfully!");
         pause();
     }
+
 
     private static void manageAppointments(PetService petService, AppointmentService appointmentService) {
         boolean exit = false;
@@ -138,7 +155,7 @@ public class Main {
             switch (option) {
                 case 1 -> listAppointments(appointmentService, petService);
                 case 2 -> createAppointment(petService, appointmentService);
-                case 3 -> updateAppointment(appointmentService);
+                case 3 -> updateAppointment(petService, appointmentService);
                 case 4 -> deleteAppointment(appointmentService);
                 case 0 -> exit = true;
                 default -> { ViewUtil.printHeader("Invalid option!"); pause(); }
@@ -171,35 +188,119 @@ public class Main {
     }
 
     private static void createAppointment(PetService petService, AppointmentService appointmentService) {
-        int petId = InputUtil.getInteger("Enter pet ID");
-        LocalDate checkIn = InputUtil.getDate("Enter check-in date");
-        LocalDate checkOut = InputUtil.getDate("Enter check-out date");
-        double pricePerDay = InputUtil.getDouble("Enter price per day");
+        ViewUtil.printHeader("Add New Appointment");
 
-        String paymentStatus = InputUtil.getPaymentStatus("Enter payment status", null);
-        String paymentMethod = InputUtil.getPaymentMethod("Enter payment method", paymentStatus, "");
-        String status = InputUtil.getAppointmentStatus("Enter status", null);
+        Pet pet;
+        int petId;
 
-        Appointment appt = new Appointment();
-        appt.setPetId(petId); appt.setCheckIn(checkIn); appt.setCheckOut(checkOut);
-        appt.setPricePerDay(pricePerDay); appt.setPaymentStatus(paymentStatus);
-        appt.setPaymentMethod(paymentMethod); appt.setStatus(status);
+        while (true) {
+            petId = InputUtil.getInteger("Enter Pet ID");
+            try {
+                pet = petService.getPetById(petId);
+                break; // valid pet
+            } catch (RuntimeException e) {
+                System.out.println("Pet ID not found!");
+            }
+        }
 
-        appointmentService.createAppointment(appt);
-        ViewUtil.printHeader("Appointment created successfully!");
+        LocalDate checkIn = InputUtil.getDate("Enter check-in date (yyyy-MM-dd)");
+        LocalDate checkOut = InputUtil.getDate("Enter check-out date (yyyy-MM-dd)");
+
+        String paymentStatus = InputUtil.getOptionalPaymentStatus("Enter payment status (paid/unpaid)", null);
+        String paymentMethod = InputUtil.getOptionalPaymentMethod("Enter payment method (cash/atm)", paymentStatus, null);
+        String status = InputUtil.getOptionalAppointmentStatus("Enter status (accept/pending/cancel)", null);
+
+        Appointment appointment = new Appointment();
+        appointment.setPetId(petId);
+        appointment.setCheckIn(checkIn);
+        appointment.setCheckOut(checkOut);
+        appointment.setPaymentStatus(paymentStatus);
+        appointment.setPaymentMethod(paymentMethod);
+        appointment.setStatus(status);
+
+        appointmentService.createAppointment(appointment);
+
+        ViewUtil.printHeader("✅ Appointment created successfully!");
         pause();
     }
 
-    private static void updateAppointment(AppointmentService appointmentService) {
 
+
+    private static void updateAppointment(PetService petService, AppointmentService appointmentService) {
+        ViewUtil.printHeader("Update Appointment");
+
+        Appointment existing;
+        int apptId;
+        while (true) {
+            apptId = InputUtil.getInteger("Enter Appointment ID to update");
+            try {
+                existing = appointmentService.getAppointmentById(apptId);
+                break;
+            } catch (RuntimeException e) {
+                System.out.println("Appointment ID not found");
+            }
+        }
+
+        System.out.println("Leave empty to keep current value");
+
+        LocalDate checkIn = InputUtil.getOptionalDate("Enter new check-in date", existing.getCheckIn());
+        LocalDate checkOut = InputUtil.getOptionalDate("Enter new check-out date", existing.getCheckOut());
+        String paymentStatus = InputUtil.getOptionalPaymentStatus("Enter new payment status (paid/unpaid)", existing.getPaymentStatus());
+        String paymentMethod = InputUtil.getOptionalPaymentMethod("Enter new payment method (cash/atm)", paymentStatus, existing.getPaymentMethod());
+        String status = InputUtil.getOptionalAppointmentStatus("Enter new status (accept/pending/cancel)", existing.getStatus());
+
+        Appointment updated = new Appointment();
+        updated.setCheckIn(checkIn);
+        updated.setCheckOut(checkOut);
+        updated.setPaymentStatus(paymentStatus);
+        updated.setPaymentMethod(paymentMethod);
+        updated.setStatus(status);
+
+        try {
+            appointmentService.updateAppointment(apptId, updated);
+            ViewUtil.printHeader("✅ Appointment updated successfully!");
+        } catch (RuntimeException e) {
+            System.out.println("Failed to update appointment: " + e.getMessage());
+        }
+
+        pause();
     }
 
-    private static void deleteAppointment(AppointmentService appointmentService) {
 
+    private static void deleteAppointment(AppointmentService appointmentService) {
+        ViewUtil.printHeader("Delete Appointment");
+
+        int apptId;
+        Appointment existing;
+
+        while (true) {
+            String input = InputUtil.getText("Enter Appointment ID to delete (or Q to quit)").trim();
+            if (input.equalsIgnoreCase("Q")) return;
+
+            try {
+                apptId = Integer.parseInt(input);
+                existing = appointmentService.getAppointmentById(apptId);
+                break; // valid ID found, exit loop
+            } catch (NumberFormatException e) {
+                System.out.println("Invalid number");
+            } catch (RuntimeException e) {
+                System.out.println("Appointment ID does not exist!");
+            }
+        }
+
+        String confirm = InputUtil.getText("Are you sure you want to delete? [Y/n]").trim();
+        if (confirm.equalsIgnoreCase("Y")) {
+            appointmentService.softDeleteAppointment(apptId);
+            ViewUtil.printHeader("Appointment deleted successfully!");
+        } else {
+            System.out.println("Deletion cancelled.");
+        }
+
+        pause();
     }
 
     private static void pause() {
         System.out.println("Press Enter to continue or type 'Q' to quit");
-        String input = InputUtil.getText("").trim();
+        InputUtil.getText("");
     }
 }

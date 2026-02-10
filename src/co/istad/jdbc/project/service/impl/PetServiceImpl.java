@@ -51,7 +51,7 @@ public class PetServiceImpl implements PetService {
     public void updateById(Integer petId, Pet pet) {
         try {
             Pet existingPet = getPetById(petId);
-            if (existingPet.getDeleted()) {
+            if (!existingPet.getDeleted()) {
                 throw new RuntimeException("Cannot update. This pet has been deleted!");
             }
             if (!pet.getName().isBlank()) existingPet.setName(pet.getName());
@@ -80,7 +80,7 @@ public class PetServiceImpl implements PetService {
         try {
             // Check if pet exists
             Pet existingPet = getPetById(petId);
-            if (existingPet.getDeleted()) {
+            if (!existingPet.getDeleted()) {
                 throw new RuntimeException("Pet is already deleted!");
             }
 
